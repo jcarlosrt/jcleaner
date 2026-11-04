@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Letra J con destellos de limpieza, en la zona segura de 66x66 del icono adaptativo -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,32h9v30c0,9.5 -6.5,16 -16,16c-8.5,0 -14.5,-5.2 -15.5,-13h9c0.8,3 3.2,5 6.5,5c4.3,0 7,-2.9 7,-8V32z" />
+    <path
+        android:fillColor="#C9F2E3"
+        android:pathData="M40,30l2.2,5.8l5.8,2.2l-5.8,2.2l-2.2,5.8l-2.2,-5.8l-5.8,-2.2l5.8,-2.2z" />
+    <path
+        android:fillColor="#C9F2E3"
+        android:pathData="M76,54l1.5,3.8l3.8,1.5l-3.8,1.5l-1.5,3.8l-1.5,-3.8l-3.8,-1.5l3.8,-1.5z" />
+</vector>
