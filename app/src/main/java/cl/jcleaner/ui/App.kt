@@ -35,6 +35,7 @@ sealed interface Pantalla {
     data object Cache : Pantalla
     data object Salud : Pantalla
     data object Acerca : Pantalla
+    data object Contactos : Pantalla
 
     /** Lista de archivos de una categoría; [obtener] lee siempre la versión actual (después de borrar). */
     class Archivos(val titulo: String, val descripcion: String?, val obtener: () -> List<Archivo>) : Pantalla
@@ -93,6 +94,7 @@ fun App() {
                 Pantalla.Cache -> PantallaCache()
                 Pantalla.Salud -> PantallaSalud(onAtras = atras)
                 Pantalla.Acerca -> PantallaAcerca(onAtras = atras)
+                Pantalla.Contactos -> PantallaContactos(onAtras = atras)
                 is Pantalla.Archivos -> PantallaArchivos(p, onAtras = atras)
             }
         }

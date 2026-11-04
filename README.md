@@ -30,6 +30,7 @@ Requiere Android 8.0 o más nuevo.
 | **Limpiar** | APK ya instalados, miniaturas temporales, archivos .tmp/.log, carpetas vacías, descargas de más de 90 días y archivos de más de 100 MB. |
 | **Chats** | WhatsApp, WhatsApp Business y Telegram separados en imágenes, videos, notas de voz, documentos, stickers, estados… Filtros por antigüedad y "solo enviados por mí". |
 | **Repetidos** | Fotos idénticas o muy parecidas (reenviadas, redimensionadas, comprimidas) y archivos duplicados de cualquier tipo. Conserva automáticamente la de mejor calidad. |
+| **Contactos** | Encuentra contactos repetidos: mismo teléfono (aunque esté escrito distinto o con otro nombre), mismo correo o mismo nombre. Los une en uno solo sin perder datos, quita números repetidos y contactos vacíos. Guarda un respaldo .vcf antes de cualquier cambio. |
 | **Caché** | Cuánto caché tiene cada app, ordenado de mayor a menor, con acceso directo para borrarlo. |
 | **Salud** | Estado, temperatura, voltaje, corriente, capacidad estimada vs. la de fábrica, ciclos de carga (Android 14+), almacenamiento, RAM y consejos. |
 
@@ -45,6 +46,7 @@ Requiere Android 8.0 o más nuevo.
 |---|---|
 | Acceso a todos los archivos | Revisar y borrar basura, archivos de chats y fotos repetidas. |
 | Acceso de uso | Solo para medir el caché de cada app. |
+| Contactos | Solo para encontrar y unir contactos duplicados. |
 | Ver apps instaladas | Para listar las apps en la sección Caché. |
 
 ## Compilar desde el código

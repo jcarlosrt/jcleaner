@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryStd
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.CleaningServices
+import androidx.compose.material.icons.rounded.Contacts
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonitorHeart
@@ -165,6 +166,12 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
             Herramienta(Icons.Rounded.PhotoLibrary, "Fotos repetidas",
                 if (g != null) "${g.sumOf { it.recuperable }.legible()} en ${g.size} grupos de repetidas" else "Fotos idénticas o muy parecidas, y archivos duplicados") {
                 onPestana(Pantalla.Duplicados)
+            }
+        }
+        item {
+            Herramienta(Icons.Rounded.Contacts, "Contactos duplicados",
+                "Une contactos repetidos o con el mismo teléfono y distinto nombre") {
+                onIr(Pantalla.Contactos)
             }
         }
         item {
