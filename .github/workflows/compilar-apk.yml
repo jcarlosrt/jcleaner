@@ -2,30 +2,55 @@ name: Compilar APK
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   compilar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Compilar
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
+      - name: Verificar que no tenga permiso de internet
+        run: |
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt2 | tail -1)
+          $AAPT dump permissions app/build/outputs/apk/debug/app-debug.apk | tee permisos.txt
+          if grep -q "android.permission.INTERNET" permisos.txt; then echo "ERROR: el APK pide internet"; exit 1; fi
+
       - name: Renombrar
         run: cp app/build/outputs/apk/debug/app-debug.apk JCLEANER.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: JCLEANER-apk
           path: JCLEANER.apk
+
+      # Cada versión nueva en main se publica en Releases para descargarla directo
+      - name: Publicar en Releases
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" JCLEANER.apk --clobber
+          else
+            gh release create "$TAG" JCLEANER.apk --title "JCLEANER $VERSION" \
+              --notes "Descarga **JCLEANER.apk**, ábrelo en tu teléfono Android y permite la instalación. Código abierto bajo GPL-3.0."
+          fi

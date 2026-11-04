@@ -22,8 +22,11 @@ import androidx.compose.material.icons.rounded.BatteryStd
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -77,9 +80,14 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Column(Modifier.padding(start = 4.dp, bottom = 4.dp)) {
-                Text("JCLEANER", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-                Text("${equipo.fabricante} ${equipo.modelo} · Android ${equipo.android}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("JCLEANER", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                    Text("${equipo.fabricante} ${equipo.modelo} · Android ${equipo.android}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { onIr(Pantalla.Acerca) }) {
+                    Icon(Icons.Rounded.Info, "Acerca de", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
         item {
