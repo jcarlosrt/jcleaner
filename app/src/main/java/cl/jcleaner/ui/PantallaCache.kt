@@ -1,6 +1,8 @@
 package cl.jcleaner.ui
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import cl.jcleaner.data.InfoApp
 import cl.jcleaner.data.Motor
 import cl.jcleaner.util.Permisos
+import cl.jcleaner.util.hace
 import cl.jcleaner.util.legible
 
 private const val MB = 1024L * 1024
@@ -68,6 +71,9 @@ fun PantallaCache() {
     var sistema by remember { mutableStateOf(false) }
     var orden by remember { mutableIntStateOf(0) }
     var ayuda by remember { mutableStateOf<InfoApp?>(null) }
+    var vista by remember { mutableIntStateOf(0) } // 0 = caché, 1 = apps sin usar
+    val ahora = remember { System.currentTimeMillis() }
+    val limite = ahora - 30L * 86_400_000L
 
     LaunchedEffect(Unit) { if (Motor.apps == null && Motor.progApps == null) Motor.cargarApps(ctx.applicationContext) }
     // al volver de la pantalla de la app, se actualizan los tamaños
@@ -81,18 +87,48 @@ fun PantallaCache() {
         }
     }
 
+    // apps instaladas por ti que no se abren hace más de un mes
+    val sinUsar = Motor.apps?.filter {
+        !it.sistema && it.paquete != ctx.packageName &&
+            (if (it.ultimoUso > 0) it.ultimoUso < limite else it.instaladaEl in 1 until limite)
+    }?.sortedByDescending { it.apk + it.datos }
+
     fun abrir(a: InfoApp) {
         if (prefs.getBoolean("ayuda_vista", false)) Permisos.abrirInfoApp(ctx, a.paquete) else ayuda = a
     }
 
     Column(Modifier.fillMaxSize()) {
-        Encabezado("Caché de apps", "Cuánto ocupa el caché de cada app") {
+        Encabezado("Apps", if (vista == 0) "Cuánto ocupa el caché de cada app" else "Apps que no abres hace más de un mes") {
             IconButton(onClick = { Motor.cargarApps(ctx.applicationContext) }, enabled = prog == null) {
                 Icon(Icons.Rounded.Refresh, "Actualizar")
             }
         }
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Opcion("Caché", vista == 0) { vista = 0 }
+            Opcion("Apps sin usar${sinUsar?.let { " (${it.size})" } ?: ""}", vista == 1) { vista = 1 }
+        }
         when {
             prog != null -> Cargando(prog)
+            vista == 1 && sinUsar != null -> {
+                if (sinUsar.isEmpty()) {
+                    Vacio(Icons.Rounded.Apps, "Usas todas tus apps. ¡Bien!")
+                } else {
+                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            ResumenGrande(sinUsar.sumOf { it.apk + it.datos }, "ocupan ${sinUsar.size} apps que no usas")
+                            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Rounded.Info, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Según el registro de uso de Android. Desinstalar borra la app y sus datos; siempre puedes volver a instalarla desde Play Store.",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        items(sinUsar, key = { "u-" + it.paquete }) { a -> FilaSinUsar(a) { desinstalar(ctx, a.paquete) } }
+                    }
+                }
+            }
             apps == null -> Vacio(Icons.Rounded.Apps, "Mide el caché de tus apps", "Medir") { Motor.cargarApps(ctx.applicationContext) }
             else -> LazyColumn(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -171,6 +207,36 @@ private fun FilaApp(a: InfoApp, onBorrar: () -> Unit) {
                 )
             }
             FilledTonalButton(onClick = onBorrar, enabled = a.cache > 0) { Text("Borrar") }
+        }
+    }
+}
+
+private fun desinstalar(ctx: Context, paquete: String) {
+    try {
+        @Suppress("DEPRECATION")
+        ctx.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$paquete")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        Permisos.abrirInfoApp(ctx, paquete)
+    }
+}
+
+@Composable
+private fun FilaSinUsar(a: InfoApp, onDesinstalar: () -> Unit) {
+    Tarjeta {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val icono = a.icono
+            if (icono != null) Image(icono, null, Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)))
+            else IconoRedondo(Icons.Rounded.Apps, tam = 42.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(a.nombre, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (a.ultimoUso > 0) "Abierta por última vez ${hace(a.ultimoUso)}" else "Sin uso registrado desde que se instaló",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text("Ocupa ${(a.apk + a.datos).legible()}", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            FilledTonalButton(onClick = onDesinstalar) { Text("Desinstalar") }
         }
     }
 }

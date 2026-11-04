@@ -12,13 +12,28 @@ android {
         applicationId = "cl.jcleaner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
+    }
+
+    // La clave permanente llega desde los secretos de GitHub (o variables de entorno locales).
+    // Sin clave, la versión "release" se firma con la clave de prueba, solo para compilar.
+    val rutaClave = System.getenv("JCLEANER_KEYSTORE")
+    signingConfigs {
+        if (rutaClave != null && file(rutaClave).exists()) {
+            create("permanente") {
+                storeFile = file(rutaClave)
+                storePassword = System.getenv("JCLEANER_KEYSTORE_PASSWORD")
+                keyAlias = "jcleaner"
+                keyPassword = System.getenv("JCLEANER_KEYSTORE_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("permanente") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -51,6 +66,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")

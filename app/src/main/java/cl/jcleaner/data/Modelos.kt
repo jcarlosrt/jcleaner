@@ -51,7 +51,16 @@ data class GrupoDuplicados(val archivos: List<Archivo>, val identicos: Boolean) 
     val recuperable: Long = archivos.drop(1).sumOf { it.tamano }
 }
 
-data class Resultado(val cantidad: Int, val bytes: Long, val rutas: Set<String>, val fallidos: Int)
+data class Resultado(
+    val cantidad: Int,
+    val bytes: Long,
+    val rutas: Set<String>,
+    val fallidos: Int,
+    /** true si los archivos quedaron en la papelera (el espacio se libera al vaciarla) */
+    val papelera: Boolean = false,
+    /** bytes liberados de inmediato */
+    val liberados: Long = bytes,
+)
 
 data class InfoApp(
     val paquete: String,
@@ -61,7 +70,13 @@ data class InfoApp(
     val datos: Long,
     val cache: Long,
     val sistema: Boolean,
+    /** Última vez que se abrió (0 si Android no tiene registro). */
+    val ultimoUso: Long = 0,
+    val instaladaEl: Long = 0,
 ) {
     /** Android incluye el caché dentro de "datos"; acá se muestran separados. */
     val datosSinCache: Long get() = (datos - cache).coerceAtLeast(0)
 }
+
+/** Tamaño de cada carpeta del almacenamiento y de cada tipo de archivo. */
+data class MapaEspacio(val porCarpeta: Map<String, Long>, val categorias: Map<String, Long>, val totalArchivos: Long)

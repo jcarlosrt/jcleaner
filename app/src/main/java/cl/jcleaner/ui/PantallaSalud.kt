@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.SdStorage
+import androidx.compose.material.icons.rounded.Timeline
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -38,7 +39,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import cl.jcleaner.data.MuestraBateria
+import cl.jcleaner.data.RegistroBateria
 import cl.jcleaner.data.Salud
+import cl.jcleaner.util.Ajustes
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import cl.jcleaner.util.duracion
 import cl.jcleaner.util.legible
 import kotlinx.coroutines.delay
@@ -102,6 +112,7 @@ fun PantallaSalud(onAtras: () -> Unit) {
                     }
                 }
             }
+            item { HistorialBateria() }
             item {
                 Tarjeta {
                     Titulo(Icons.Rounded.SdStorage, "Almacenamiento")
@@ -174,4 +185,64 @@ private fun Barra(fraccion: Float) {
         trackColor = MaterialTheme.colorScheme.surfaceVariant,
         strokeCap = StrokeCap.Round,
     )
+}
+
+/** Gráfico de las últimas 48 horas: nivel (línea) y momentos de carga (franjas). */
+@Composable
+private fun HistorialBateria() {
+    val ctx = LocalContext.current
+    var muestras by remember { mutableStateOf<List<MuestraBateria>>(emptyList()) }
+    var semana by remember { mutableStateOf<List<MuestraBateria>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val ahora = System.currentTimeMillis()
+            semana = withContext(Dispatchers.IO) { RegistroBateria.leer(ctx, ahora - 7 * 86_400_000L) }
+            muestras = semana.filter { it.fecha >= ahora - 48 * 3_600_000L }
+            delay(60_000)
+        }
+    }
+    Tarjeta {
+        Titulo(Icons.Rounded.Timeline, "Historial de batería (48 horas)")
+        if (!Ajustes.registroBateria(ctx)) {
+            Text("El registro está apagado. Actívalo en Ajustes (ícono ⓘ en Inicio).", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            return@Tarjeta
+        }
+        if (muestras.size < 3) {
+            Text(
+                "Todavía hay pocos datos. JCLEANER anota el nivel de batería cada 15 minutos; vuelve en unas horas para ver el gráfico.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Tarjeta
+        }
+        val primario = MaterialTheme.colorScheme.primary
+        val carga = MaterialTheme.colorScheme.secondaryContainer
+        val rejilla = MaterialTheme.colorScheme.surfaceVariant
+        val calor = Rojo
+        Canvas(Modifier.fillMaxWidth().height(160.dp).padding(vertical = 8.dp)) {
+            val t0 = muestras.first().fecha.toFloat()
+            val t1 = maxOf(muestras.last().fecha.toFloat(), t0 + 1f)
+            fun x(t: Long) = (t - t0) / (t1 - t0) * size.width
+            fun y(nivel: Float) = size.height * (1f - nivel / 100f)
+            for (k in 0..4) {
+                val yy = size.height * k / 4f
+                drawLine(rejilla, Offset(0f, yy), Offset(size.width, yy), strokeWidth = 1f)
+            }
+            for (k in 1 until muestras.size) {
+                val a = muestras[k - 1]
+                if (a.cargando) drawRect(carga, topLeft = Offset(x(a.fecha), 0f), size = androidx.compose.ui.geometry.Size(x(muestras[k].fecha) - x(a.fecha), size.height))
+            }
+            val linea = Path()
+            muestras.forEachIndexed { k, m -> if (k == 0) linea.moveTo(x(m.fecha), y(m.nivel.toFloat())) else linea.lineTo(x(m.fecha), y(m.nivel.toFloat())) }
+            drawPath(linea, primario, style = Stroke(width = 3.dp.toPx()))
+            // temperatura sobre 40 °C marcada en rojo
+            muestras.filter { it.temperatura > 40f }.forEach { m -> drawCircle(calor, radius = 3.dp.toPx(), center = Offset(x(m.fecha), y(m.nivel.toFloat()))) }
+        }
+        Text("Línea: nivel de carga · franjas: cargando · puntos rojos: sobre 40 °C", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val consumo = RegistroBateria.consumoPorHora(semana)
+        if (consumo != null) {
+            Fila("Consumo promedio en uso", "${"%.1f".format(consumo)}% por hora")
+            if (consumo > 0.1f) Fila("Duración estimada (de 100% a 0%)", "${(100f / consumo).toInt()} horas")
+        }
+        Fila("Temperatura máxima (7 días)", "${semana.maxOfOrNull { it.temperatura } ?: 0f} °C", if ((semana.maxOfOrNull { it.temperatura } ?: 0f) > 45f) Rojo else null)
+    }
 }

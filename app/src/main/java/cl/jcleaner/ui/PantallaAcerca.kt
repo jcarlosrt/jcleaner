@@ -1,6 +1,17 @@
 package cl.jcleaner.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import cl.jcleaner.data.Papelera
+import cl.jcleaner.data.Programador
+import cl.jcleaner.util.Ajustes
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -63,7 +74,7 @@ fun PantallaAcerca(onAtras: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        Encabezado("Acerca de", onAtras = onAtras)
+        Encabezado("Ajustes y acerca de", onAtras = onAtras)
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -81,6 +92,7 @@ fun PantallaAcerca(onAtras: () -> Unit) {
                     Text(AUTOR, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
             }
+            item { TarjetaAjustes() }
             item {
                 Tarjeta {
                     Punto(Icons.Rounded.Shield, "Hace lo que dice, y nada más",
@@ -132,5 +144,39 @@ private fun Punto(icono: ImageVector, titulo: String, texto: String) {
             Text(titulo, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(texto, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun TarjetaAjustes() {
+    val ctx = LocalContext.current
+    var papelera by remember { mutableStateOf(Ajustes.usarPapelera(ctx)) }
+    var recordatorio by remember { mutableStateOf(Ajustes.recordatorio(ctx)) }
+    var bateria by remember { mutableStateOf(Ajustes.registroBateria(ctx)) }
+    val pedirNotif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    Tarjeta {
+        Text("Ajustes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Interruptor("Usar la papelera", "Lo que borras queda ${Papelera.DIAS} días por si te arrepientes", papelera) {
+            papelera = it; Ajustes.setUsarPapelera(ctx, it)
+        }
+        Interruptor("Recordatorio semanal", "Te avisa si hay más de 100 MB de basura para limpiar", recordatorio) {
+            recordatorio = it; Ajustes.setRecordatorio(ctx, it); Programador.programar(ctx)
+            if (it && Build.VERSION.SDK_INT >= 33) pedirNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        Interruptor("Registrar la batería", "Anota nivel y temperatura cada 15 minutos para el historial (gasto mínimo)", bateria) {
+            bateria = it; Ajustes.setRegistroBateria(ctx, it); Programador.programar(ctx)
+        }
+    }
+}
+
+@Composable
+private fun Interruptor(titulo: String, texto: String, valor: Boolean, onCambio: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(titulo, style = MaterialTheme.typography.bodyLarge)
+            Text(texto, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(8.dp))
+        Switch(checked = valor, onCheckedChange = onCambio)
     }
 }

@@ -16,9 +16,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.FileCopy
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +41,7 @@ import cl.jcleaner.data.Motor
 import cl.jcleaner.util.legible
 
 @Composable
-fun PantallaDuplicados() = ConAccesoArchivos {
+fun PantallaDuplicados(onVer: (Pantalla) -> Unit) = ConAccesoArchivos {
     val ctx = LocalContext.current
     var modo by remember { mutableIntStateOf(0) } // 0 = fotos, 1 = cualquier archivo
     var umbral by remember { mutableIntStateOf(6) }
@@ -53,10 +55,11 @@ fun PantallaDuplicados() = ConAccesoArchivos {
     val buscar = { if (modo == 0) Motor.buscarFotos(ctx.applicationContext, umbral) else Motor.buscarArchivos() }
 
     Column(Modifier.fillMaxSize()) {
-        Encabezado("Repetidos", "Fotos iguales o muy parecidas, y archivos duplicados")
-        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Encabezado("Repetidos", "Fotos iguales o parecidas, archivos duplicados y fotos borrosas")
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Opcion("Fotos", modo == 0) { modo = 0 }
             Opcion("Todos los archivos", modo == 1) { modo = 1 }
+            Opcion("Borrosas", modo == 2) { modo = 2 }
         }
         if (modo == 0) {
             Row(
@@ -70,7 +73,7 @@ fun PantallaDuplicados() = ConAccesoArchivos {
                 Opcion("Parecidas", umbral == 11) { umbral = 11 }
             }
         }
-        when {
+        if (modo == 2) SeccionBorrosas(onVer) else when {
             prog != null -> Cargando(prog) { Motor.cancelar(if (modo == 0) "fotos" else "archivos") }
             grupos == null -> Vacio(
                 if (modo == 0) Icons.Rounded.PhotoLibrary else Icons.Rounded.FileCopy,
@@ -168,6 +171,35 @@ private fun GrupoArchivos(g: GrupoDuplicados, sel: Set<String>, onToggle: (Archi
                     Text("Original", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SeccionBorrosas(onVer: (Pantalla) -> Unit) {
+    val ctx = LocalContext.current
+    val lista = Motor.borrosas
+    val prog = Motor.progBorrosas
+    when {
+        prog != null -> Cargando(prog) { Motor.cancelar("borrosas") }
+        lista == null -> Vacio(
+            Icons.Rounded.BlurOn,
+            "Busca fotos movidas o desenfocadas.\nLa primera vez puede tardar unos minutos; las siguientes son mucho más rápidas.",
+            "Buscar",
+        ) { Motor.buscarBorrosas(ctx.applicationContext) }
+        lista.isEmpty() -> Vacio(Icons.Rounded.TaskAlt, "No encontré fotos borrosas", "Buscar de nuevo") { Motor.buscarBorrosas(ctx.applicationContext) }
+        else -> Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.size(24.dp))
+            ResumenGrande(lista.sumOf { it.tamano }, "en ${lista.size} fotos que parecen borrosas")
+            Text(
+                "Es una detección automática: revísalas antes de borrar. Las fotos de noche, con movimiento a propósito o muy lisas (cielo, paredes) pueden aparecer aunque estén bien.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+            Button(onClick = {
+                onVer(Pantalla.Archivos("Fotos borrosas", "Revisa y marca las que quieras borrar") { Motor.borrosas.orEmpty() })
+            }, modifier = Modifier.fillMaxWidth()) { Text("Revisar las ${lista.size} fotos") }
+            TextButton(onClick = { Motor.buscarBorrosas(ctx.applicationContext) }) { Text("Buscar de nuevo") }
         }
     }
 }

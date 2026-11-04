@@ -22,6 +22,8 @@ import androidx.compose.material.icons.rounded.BatteryStd
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MonitorHeart
@@ -44,7 +46,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import cl.jcleaner.data.Bateria
+import cl.jcleaner.data.Historial
 import cl.jcleaner.data.Motor
+import cl.jcleaner.data.Papelera
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import cl.jcleaner.data.Salud
 import cl.jcleaner.util.legible
 
@@ -74,6 +83,32 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
     AlReanudar { equipo = Salud.equipo(ctx) }
     val bateria = rememberBateria()
     val puntaje = Salud.puntaje(bateria, equipo)
+    val historial = remember(Motor.liberadoTotal) { Historial.listar(ctx) }
+    var verHistorial by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { Motor.refrescarPapelera() }
+    if (verHistorial) {
+        AlertDialog(
+            onDismissRequest = { verHistorial = false },
+            title = { Text("Historial de limpieza") },
+            text = {
+                LazyColumn {
+                    item {
+                        Text("Total liberado: ${historial.sumOf { it.bytes }.legible()}", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                    items(historial.take(100)) { l ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                Text(l.tipo, style = MaterialTheme.typography.bodyMedium)
+                                Text("${fechaCorta(l.fecha)} · ${l.cantidad} archivos", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(l.bytes.legible(), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { verHistorial = false }) { Text("Cerrar") } },
+        )
+    }
 
     LazyColumn(
         Modifier.statusBarsPadding(),
@@ -107,8 +142,12 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
                         Text("${equipo.almUsado.legible()} de ${equipo.almTotal.legible()}")
                         Text("Libre: ${equipo.almLibre.legible()}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                         Text("RAM: ${(equipo.fraccionRam * 100).toInt()}% en uso", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        if (Motor.liberadoTotal > 0) {
-                            Text("Liberado hoy: ${Motor.liberadoTotal.legible()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        if (historial.isNotEmpty()) {
+                            Text(
+                                "Has liberado ${historial.sumOf { it.bytes }.legible()} en total",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { verHistorial = true },
+                            )
                         }
                     }
                 }
@@ -169,6 +208,18 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
             }
         }
         item {
+            Herramienta(Icons.Rounded.PieChart, "¿Qué ocupa mi espacio?", "Mira qué carpetas y tipos de archivo llenan tu teléfono") {
+                onIr(Pantalla.Espacio)
+            }
+        }
+        item {
+            Herramienta(Icons.Rounded.DeleteOutline, "Papelera",
+                if (Motor.cantidadPapelera > 0) "${Motor.cantidadPapelera} archivos · ${Motor.enPapelera.legible()} (se liberan al vaciarla)"
+                else "Lo que borras queda aquí ${Papelera.DIAS} días por si te arrepientes") {
+                onIr(Pantalla.Papelera)
+            }
+        }
+        item {
             Herramienta(Icons.Rounded.Contacts, "Contactos duplicados",
                 "Une contactos repetidos o con el mismo teléfono y distinto nombre") {
                 onIr(Pantalla.Contactos)
@@ -205,3 +256,6 @@ private fun Herramienta(icono: ImageVector, titulo: String, texto: String, onCli
         }
     }
 }
+
+private fun fechaCorta(ms: Long): String =
+    java.text.SimpleDateFormat("d MMM yyyy, HH:mm", java.util.Locale("es")).format(java.util.Date(ms))

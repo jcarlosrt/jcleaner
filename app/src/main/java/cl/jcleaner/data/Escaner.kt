@@ -12,6 +12,7 @@ import java.io.File
 object Escaner {
 
     val raiz: File get() = Environment.getExternalStorageDirectory()
+    const val PAPELERA_DIR = ".JCLEANER_papelera"
 
     private val EXT_TEMPORAL = setOf("tmp", "temp", "log", "dmp", "chk", "part", "crdownload", "partial")
     private const val GRANDE = 100L * 1024 * 1024
@@ -22,7 +23,8 @@ object Escaner {
         val android = File(raiz, "Android")
         return desde.walkTopDown()
             .onEnter { d ->
-                !(d.parentFile == android && (d.name == "data" || d.name == "obb")) &&
+                d.name != PAPELERA_DIR &&
+                    !(d.parentFile == android && (d.name == "data" || d.name == "obb")) &&
                     (incluirOcultos || d == desde || !d.name.startsWith("."))
             }
             .filter { it.isFile }
@@ -42,6 +44,8 @@ object Escaner {
         val temporales = mutableListOf<Archivo>()
         val grandes = mutableListOf<Archivo>()
         val viejas = mutableListOf<Archivo>()
+        val capturas = mutableListOf<Archivo>()
+        val limiteCaptura = System.currentTimeMillis() - 30 * DIA
         val descargas = File(raiz, Environment.DIRECTORY_DOWNLOADS).absolutePath + "/"
         val limiteViejo = System.currentTimeMillis() - 90 * DIA
         var n = 0
@@ -61,6 +65,7 @@ object Escaner {
             }
             if (a.tamano >= GRANDE) grandes += a
             if (ruta.startsWith(descargas) && a.fecha < limiteViejo && ext != "apk") viejas += a
+            if (a.fecha < limiteCaptura && (a.esImagen || a.esVideo) && esCaptura(ruta)) capturas += a
         }
         progreso("Buscando carpetas vacías…")
         val vacias = carpetasVacias(raiz)
@@ -69,9 +74,56 @@ object Escaner {
             Categoria("miniaturas", "Miniaturas temporales", "Vistas previas que la galería vuelve a crear sola", miniaturas, true),
             Categoria("temporales", "Temporales y registros", "Archivos .tmp, .log y descargas a medio terminar", temporales, true),
             Categoria("vacias", "Carpetas vacías", "Carpetas que quedaron sin ningún archivo", vacias, true),
+            Categoria("capturas", "Capturas de pantalla antiguas", "Capturas y grabaciones de pantalla de hace más de un mes. Revísalas antes de borrar", capturas.sortedBy { it.fecha }),
             Categoria("descargas", "Descargas antiguas", "En Descargas, sin modificar hace más de 90 días. Revísalas antes de borrar", viejas.sortedByDescending { it.tamano }),
             Categoria("grandes", "Archivos grandes", "Archivos de más de 100 MB en cualquier carpeta. Revísalos antes de borrar", grandes.sortedByDescending { it.tamano }),
         )
+    }
+
+    private fun esCaptura(ruta: String): Boolean {
+        val r = ruta.lowercase()
+        return r.contains("/screenshots/") || r.contains("/capturas") || r.contains("/screen recordings/") ||
+            r.contains("/screenrecorder/") || r.contains("/screen_recordings/")
+    }
+
+    // ------------------------------------------------------------------ ¿qué ocupa mi espacio?
+
+    suspend fun mapaEspacio(progreso: (String) -> Unit): MapaEspacio = withContext(Dispatchers.IO) {
+        val porCarpeta = HashMap<String, Long>()
+        val categorias = linkedMapOf(
+            "Fotos" to 0L, "Videos" to 0L, "Audio" to 0L, "Documentos" to 0L, "APK" to 0L, "Otros" to 0L,
+        )
+        val base = raiz.absolutePath
+        var n = 0
+        var total = 0L
+        for (f in archivos()) {
+            n++
+            if (n % 500 == 0) {
+                currentCoroutineContext().ensureActive()
+                progreso("Midiendo carpetas… $n archivos")
+            }
+            val len = f.length()
+            total += len
+            val ext = f.extension.lowercase()
+            val cat = when {
+                ext in EXT_IMAGEN -> "Fotos"
+                ext in EXT_VIDEO -> "Videos"
+                ext in EXT_AUDIO -> "Audio"
+                ext in setOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "odt", "csv", "epub") -> "Documentos"
+                ext == "apk" -> "APK"
+                else -> "Otros"
+            }
+            categorias[cat] = (categorias[cat] ?: 0L) + len
+            // suma el tamaño a cada carpeta que lo contiene, hasta la raíz
+            var p = f.parentFile
+            while (p != null) {
+                val ruta = p.absolutePath
+                porCarpeta[ruta] = (porCarpeta[ruta] ?: 0L) + len
+                if (ruta == base) break
+                p = p.parentFile
+            }
+        }
+        MapaEspacio(porCarpeta, categorias, total)
     }
 
     private val PROTEGIDAS = setOf(

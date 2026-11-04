@@ -91,3 +91,14 @@ object Permisos {
         return true
     }
 }
+
+/** Preferencias de la app. */
+object Ajustes {
+    private fun prefs(ctx: Context) = ctx.getSharedPreferences("jcleaner", Context.MODE_PRIVATE)
+    fun usarPapelera(ctx: Context) = prefs(ctx).getBoolean("usar_papelera", true)
+    fun setUsarPapelera(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean("usar_papelera", v).apply()
+    fun recordatorio(ctx: Context) = prefs(ctx).getBoolean("recordatorio", true)
+    fun setRecordatorio(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean("recordatorio", v).apply()
+    fun registroBateria(ctx: Context) = prefs(ctx).getBoolean("registro_bateria", true)
+    fun setRegistroBateria(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean("registro_bateria", v).apply()
+}

@@ -5,6 +5,7 @@ import android.media.MediaScannerConnection
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -103,15 +104,65 @@ object Motor {
         }
     }
 
+    // ------------------------------------------------------------------ fotos borrosas y espacio
+
+    var borrosas by mutableStateOf<List<Archivo>?>(null)
+    var progBorrosas by mutableStateOf<String?>(null)
+
+    var espacio by mutableStateOf<MapaEspacio?>(null)
+    var progEspacio by mutableStateOf<String?>(null)
+
+    fun buscarBorrosas(ctx: Context) =
+        tarea("borrosas", "Buscando fotos borrosas…", { progBorrosas = it }, { av -> Duplicados.borrosas(ctx, av) }) { borrosas = it }
+
+    fun analizarEspacio() =
+        tarea("espacio", "Midiendo carpetas…", { progEspacio = it }, { av -> Escaner.mapaEspacio(av) }) { espacio = it }
+
+    // ------------------------------------------------------------------ papelera
+
+    var enPapelera by mutableLongStateOf(0L)
+    var cantidadPapelera by mutableIntStateOf(0)
+
+    fun refrescarPapelera() {
+        scope.launch {
+            val l = withContext(Dispatchers.IO) { Papelera.listar() }
+            enPapelera = l.sumOf { it.tamano }
+            cantidadPapelera = l.size
+        }
+    }
+
+    /** Al abrir la app: elimina lo que lleva más de 7 días en la papelera. */
+    fun alIniciar(ctx: Context) {
+        scope.launch {
+            val b = withContext(Dispatchers.IO) {
+                try { Papelera.purgarVencidas(ctx) } catch (e: Exception) { 0L }
+            }
+            liberadoTotal += b
+            refrescarPapelera()
+        }
+    }
+
     // ------------------------------------------------------------------ borrar
 
-    suspend fun borrar(ctx: Context, archivos: Collection<Archivo>): Resultado {
+    /**
+     * Borra (o mueve a la papelera, si [definitivo] es false) los archivos.
+     * Las carpetas vacías se borran siempre de inmediato.
+     */
+    suspend fun borrar(ctx: Context, archivos: Collection<Archivo>, definitivo: Boolean = false): Resultado {
         val r = withContext(Dispatchers.IO) {
             var n = 0
             var bytes = 0L
             val borrados = HashSet<String>()
             val escanear = ArrayList<String>()
-            for (a in archivos) {
+            val aPapelera = if (definitivo) emptyList() else archivos.filter { !it.esCarpeta }
+            if (aPapelera.isNotEmpty()) {
+                val movidos = Papelera.mover(aPapelera)
+                for (a in aPapelera) if (a.ruta in movidos) { n++; bytes += a.tamano; borrados += a.ruta; escanear += a.ruta }
+            }
+            val directos = if (definitivo) archivos else archivos.filter { it.esCarpeta }
+            var bytesDirectos = 0L
+            var nDirectos = 0
+            for (a in directos) {
                 val f = a.file
                 val ok = try {
                     if (f.isDirectory) {
@@ -124,20 +175,38 @@ object Motor {
                     false
                 }
                 if (ok) {
-                    n++
-                    bytes += a.tamano
+                    n++; nDirectos++
+                    bytes += a.tamano; bytesDirectos += a.tamano
                     borrados += a.ruta
                     if (!a.esCarpeta) escanear += a.ruta
                 }
             }
-            // avisa a la galería que esos archivos ya no existen
+            if (nDirectos > 0) Historial.registrar(ctx, bytesDirectos, nDirectos, "Borrado definitivo")
+            // avisa a la galería que esos archivos ya no están
             if (escanear.isNotEmpty()) {
                 escanear.chunked(500).forEach { MediaScannerConnection.scanFile(ctx, it.toTypedArray(), null, null) }
             }
-            Resultado(n, bytes, borrados, archivos.size - n)
+            Resultado(n, bytes, borrados, archivos.size - n, papelera = !definitivo && aPapelera.isNotEmpty(), liberados = bytesDirectos)
         }
-        liberadoTotal += r.bytes
+        liberadoTotal += r.liberados
         quitar(r.rutas)
+        // descuenta lo borrado del mapa de espacio, sin volver a medir todo
+        espacio?.let { m ->
+            val nuevo = HashMap(m.porCarpeta)
+            val base = Escaner.raiz.absolutePath
+            for (a in archivos) {
+                if (a.ruta !in r.rutas || a.esCarpeta) continue
+                var p = a.file.parentFile
+                while (p != null) {
+                    val k = p.absolutePath
+                    nuevo[k] = ((nuevo[k] ?: 0L) - a.tamano).coerceAtLeast(0L)
+                    if (k == base) break
+                    p = p.parentFile
+                }
+            }
+            espacio = m.copy(porCarpeta = nuevo, totalArchivos = (m.totalArchivos - r.bytes).coerceAtLeast(0L))
+        }
+        refrescarPapelera()
         return r
     }
 
@@ -150,5 +219,6 @@ object Motor {
         chats = chats?.map { app -> app.copy(categorias = app.categorias.map(::limpiar).filter { it.cantidad > 0 }) }
         gruposFotos = limpiarGrupos(gruposFotos)
         gruposArchivos = limpiarGrupos(gruposArchivos)
+        borrosas = borrosas?.filterNot { it.ruta in rutas }
     }
 }

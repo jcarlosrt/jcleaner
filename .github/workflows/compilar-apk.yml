@@ -21,28 +21,52 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
 
+      # La clave permanente vive en los secretos del repositorio (nunca en el código)
+      - name: Preparar clave de firma
+        id: clave
+        env:
+          CLAVE_B64: ${{ secrets.JCLEANER_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$CLAVE_B64" ]; then
+            echo "$CLAVE_B64" | base64 -d > "$RUNNER_TEMP/jcleaner-firma.jks"
+            echo "JCLEANER_KEYSTORE=$RUNNER_TEMP/jcleaner-firma.jks" >> "$GITHUB_ENV"
+            echo "firmada=si" >> "$GITHUB_OUTPUT"
+            echo "Se firmará con la clave permanente."
+          else
+            echo "firmada=no" >> "$GITHUB_OUTPUT"
+            echo "::warning::No hay clave permanente cargada en los secretos: el APK se firma con la clave de prueba y no se publica en Releases."
+          fi
+
       - name: Compilar
+        env:
+          JCLEANER_KEYSTORE_PASSWORD: ${{ secrets.JCLEANER_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
-      - name: Verificar que no tenga permiso de internet
+      - name: Verificar firma y que no tenga permiso de internet
         run: |
-          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt2 | tail -1)
-          $AAPT dump permissions app/build/outputs/apk/debug/app-debug.apk | tee permisos.txt
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          APK=app/build/outputs/apk/release/app-release.apk
+          $BT/aapt2 dump permissions $APK | tee permisos.txt
           if grep -q "android.permission.INTERNET" permisos.txt; then echo "ERROR: el APK pide internet"; exit 1; fi
+          $BT/apksigner verify --print-certs $APK | grep -i "SHA-256" || true
 
       - name: Renombrar
-        run: cp app/build/outputs/apk/debug/app-debug.apk JCLEANER.apk
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk JCLEANER.apk
+          cp app/build/outputs/bundle/release/app-release.aab JCLEANER-playstore.aab
 
       - uses: actions/upload-artifact@v5
         with:
           name: JCLEANER-apk
-          path: JCLEANER.apk
+          path: |
+            JCLEANER.apk
+            JCLEANER-playstore.aab
 
-      # Cada versión nueva en main se publica en Releases para descargarla directo
+      # Solo las versiones firmadas con la clave permanente se publican en Releases
       - name: Publicar en Releases
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.clave.outputs.firmada == 'si'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

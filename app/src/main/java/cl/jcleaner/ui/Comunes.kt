@@ -72,7 +72,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import cl.jcleaner.data.Archivo
 import cl.jcleaner.data.Motor
+import cl.jcleaner.data.Papelera
 import cl.jcleaner.data.Resultado
+import cl.jcleaner.util.Ajustes
 import cl.jcleaner.util.Permisos
 import cl.jcleaner.util.hace
 import cl.jcleaner.util.legible
@@ -354,23 +356,47 @@ fun VistaPrevia(a: Archivo?, onCerrar: () -> Unit) {
     }
 }
 
-/** Confirma y borra. Llama a [onTerminar] con el resultado (o null si se canceló). */
+/** Confirma y borra (a la papelera, salvo que elijas borrar definitivamente). Llama a [onTerminar] con el resultado o null. */
 @Composable
 fun FlujoBorrar(pendientes: List<Archivo>?, aviso: String? = null, onTerminar: (Resultado?) -> Unit) {
     if (pendientes == null) return
     val ctx = LocalContext.current
     var borrando by remember(pendientes) { mutableStateOf(false) }
     val total = remember(pendientes) { pendientes.sumOf { it.tamano } }
+    val soloCarpetas = remember(pendientes) { pendientes.all { it.esCarpeta } }
+    var definitivo by remember(pendientes) { mutableStateOf(!Ajustes.usarPapelera(ctx)) }
+    val usaPapelera = !definitivo && !soloCarpetas
     AlertDialog(
         onDismissRequest = { if (!borrando) onTerminar(null) },
         icon = { Icon(Icons.Rounded.Delete, null) },
-        title = { Text(if (borrando) "Borrando…" else "¿Borrar ${pendientes.size} ${if (pendientes.size == 1) "elemento" else "elementos"}?") },
+        title = {
+            Text(
+                when {
+                    borrando -> "Borrando…"
+                    usaPapelera -> "¿Mover ${pendientes.size} a la papelera?"
+                    else -> "¿Borrar ${pendientes.size} ${if (pendientes.size == 1) "elemento" else "elementos"}?"
+                }
+            )
+        },
         text = {
             if (borrando) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             } else {
                 Column {
-                    Text("Se liberarán ${total.legible()}. Esta acción no se puede deshacer.")
+                    if (usaPapelera) {
+                        Text("Irán a la papelera de JCLEANER (${total.legible()}). Podrás recuperarlos durante ${Papelera.DIAS} días; después se borran solos y se libera el espacio.")
+                    } else {
+                        Text("Se liberarán ${total.legible()}. Esta acción no se puede deshacer.")
+                    }
+                    if (!soloCarpetas) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { definitivo = !definitivo }.padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(checked = definitivo, onCheckedChange = { definitivo = it })
+                            Text("Borrar definitivamente (liberar el espacio ahora)", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                     if (aviso != null) Text(aviso, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
                 }
             }
@@ -381,14 +407,15 @@ fun FlujoBorrar(pendientes: List<Archivo>?, aviso: String? = null, onTerminar: (
                     onClick = {
                         borrando = true
                         Motor.scope.launch {
-                            val r = Motor.borrar(ctx.applicationContext, pendientes)
+                            val r = Motor.borrar(ctx.applicationContext, pendientes, definitivo = definitivo)
                             val extra = if (r.fallidos > 0) " · ${r.fallidos} no se pudieron borrar" else ""
-                            Toast.makeText(ctx, "Liberaste ${r.bytes.legible()}$extra", Toast.LENGTH_LONG).show()
+                            val msg = if (r.papelera) "Movido a la papelera: ${r.bytes.legible()}$extra" else "Liberaste ${r.bytes.legible()}$extra"
+                            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
                             onTerminar(r)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                ) { Text("Borrar") }
+                ) { Text(if (usaPapelera) "Mover a la papelera" else "Borrar") }
             }
         },
         dismissButton = {

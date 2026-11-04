@@ -183,6 +183,116 @@ object Duplicados {
         }
     }
 
+    // ------------------------------------------------------------------ fotos borrosas
+
+    /**
+     * Mide la nitidez de cada foto (varianza del laplaciano sobre una miniatura en gris).
+     * Valores bajos = foto movida o desenfocada. Devuelve las más borrosas primero.
+     */
+    suspend fun borrosas(ctx: Context, progreso: (String) -> Unit): List<Archivo> = withContext(Dispatchers.IO) {
+        progreso("Buscando fotos…")
+        val ids = mutableListOf<Long>()
+        val fotos = mutableListOf<Archivo>()
+        @Suppress("DEPRECATION")
+        val columnas = arrayOf(
+            MediaStore.Images.Media._ID, MediaStore.Images.Media.DATA, MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT, MediaStore.Images.Media.DATE_MODIFIED,
+        )
+        ctx.contentResolver.query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columnas, null, null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val ruta = c.getString(1) ?: continue
+                val f = File(ruta)
+                val tam = c.getLong(2)
+                if (tam <= 0 || !f.exists()) continue
+                // los stickers y GIF no son fotos
+                if (f.extension.lowercase() in setOf("gif", "webp")) continue
+                ids += c.getLong(0)
+                fotos += Archivo(f, tam, c.getLong(5) * 1000, ancho = c.getInt(3), alto = c.getInt(4))
+            }
+        }
+        val cache = CacheNumeros(ctx, "nitidez.txt")
+        val resultado = mutableListOf<Pair<Archivo, Long>>()
+        for (i in fotos.indices) {
+            if (i % 20 == 0) {
+                currentCoroutineContext().ensureActive()
+                progreso("Revisando nitidez ${i + 1} de ${fotos.size}")
+            }
+            val a = fotos[i]
+            val v = cache.obtener(a) ?: nitidez(ctx, ids[i], a)?.also { cache.poner(a, it) } ?: continue
+            if (v in 0 until UMBRAL_BORROSA) resultado += a to v
+        }
+        cache.guardar()
+        resultado.sortedBy { it.second }.map { (a, v) -> a.copy(etiqueta = if (v < UMBRAL_BORROSA / 2) "Muy borrosa" else "Borrosa") }
+    }
+
+    private const val UMBRAL_BORROSA = 40L
+
+    /** -1 = imagen casi lisa (sin detalle que medir). */
+    private fun nitidez(ctx: Context, id: Long, a: Archivo): Long? = try {
+        val original: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ctx.contentResolver.loadThumbnail(ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id), Size(256, 256), null)
+        } else {
+            decodificarChica(a.file)
+        }
+        original?.let { bmp ->
+            val normal = if (bmp.config == Bitmap.Config.HARDWARE) bmp.copy(Bitmap.Config.ARGB_8888, false) else bmp
+            val e = if (normal.width > 256 || normal.height > 256) {
+                val k = 256f / maxOf(normal.width, normal.height)
+                Bitmap.createScaledBitmap(normal, maxOf(3, (normal.width * k).toInt()), maxOf(3, (normal.height * k).toInt()), true)
+            } else normal
+            val w = e.width
+            val h = e.height
+            val px = IntArray(w * h)
+            e.getPixels(px, 0, w, 0, 0, w, h)
+            val gris = IntArray(w * h) { luz(px[it]) }
+            // contraste general: si la foto es casi lisa no se puede juzgar
+            val media = gris.average()
+            val desv = Math.sqrt(gris.sumOf { (it - media) * (it - media) } / gris.size)
+            if (desv < 12) return@let -1L
+            var suma = 0.0
+            var suma2 = 0.0
+            var n = 0
+            for (y in 1 until h - 1) {
+                for (x in 1 until w - 1) {
+                    val i = y * w + x
+                    val l = (4 * gris[i] - gris[i - 1] - gris[i + 1] - gris[i - w] - gris[i + w]).toDouble()
+                    suma += l
+                    suma2 += l * l
+                    n++
+                }
+            }
+            if (n == 0) -1L else (suma2 / n - (suma / n) * (suma / n)).toLong()
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Guarda números ya calculados (huellas o nitidez) para que la próxima búsqueda sea rápida. */
+    private class CacheNumeros(ctx: Context, nombre: String) {
+        private val archivo = File(ctx.filesDir, nombre)
+        private val mapa = HashMap<String, Long>()
+
+        init {
+            try {
+                archivo.forEachLine { l ->
+                    val i = l.lastIndexOf('\t')
+                    if (i > 0) l.substring(i + 1).toLongOrNull()?.let { mapa[l.substring(0, i)] = it }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        private fun clave(a: Archivo) = "${a.ruta}|${a.tamano}|${a.fecha}"
+        fun obtener(a: Archivo): Long? = mapa[clave(a)]
+        fun poner(a: Archivo, v: Long) { mapa[clave(a)] = v }
+        fun guardar() {
+            try {
+                archivo.bufferedWriter().use { w -> for ((k, v) in mapa) { w.write(k); w.write("\t"); w.write(v.toString()); w.newLine() } }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ cualquier archivo
 
     suspend fun archivos(progreso: (String) -> Unit): List<GrupoDuplicados> = withContext(Dispatchers.IO) {
