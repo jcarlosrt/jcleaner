@@ -12,8 +12,12 @@ android {
         applicationId = "cl.jcleaner"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
+
+        // Identificador de la app registrada en Microsoft (para Outlook). Llega desde los secretos de GitHub.
+        buildConfigField("String", "MS_CLIENT_ID", "\"${System.getenv("JCLEANER_MS_CLIENT_ID") ?: ""}\"")
+        manifestPlaceholders["appAuthRedirectScheme"] = "cl.jcleaner"
     }
 
     // La clave permanente llega desde los secretos de GitHub (o variables de entorno locales).
@@ -45,6 +49,12 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md", "META-INF/LICENSE", "META-INF/NOTICE", "META-INF/LICENSE.txt", "META-INF/NOTICE.txt")
+        }
     }
     lint {
         abortOnError = false
@@ -67,6 +77,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Correo: IMAP (JavaMail para Android) e inicio de sesión de Microsoft (AppAuth)
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
+    implementation("net.openid:appauth:0.11.1")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")

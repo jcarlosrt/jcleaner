@@ -23,8 +23,9 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
-    <!-- Garantía de privacidad: la app NUNCA tiene acceso a internet, aunque una librería lo pida -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Internet: SOLO para limpiar tu correo, conectándose directo a tu servidor de correo
+         (Gmail, Outlook, etc.). JCLEANER no tiene servidores propios, ni anuncios, ni analíticas. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".JCleanerApp"

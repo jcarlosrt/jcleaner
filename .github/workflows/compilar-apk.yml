@@ -40,16 +40,20 @@ jobs:
       - name: Compilar
         env:
           JCLEANER_KEYSTORE_PASSWORD: ${{ secrets.JCLEANER_KEYSTORE_PASSWORD }}
+          JCLEANER_MS_CLIENT_ID: ${{ secrets.JCLEANER_MS_CLIENT_ID }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
-      - name: Verificar firma y que no tenga permiso de internet
+      - name: Verificar firma y permisos
         run: |
           BT=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
           APK=app/build/outputs/apk/release/app-release.apk
           $BT/aapt2 dump permissions $APK | tee permisos.txt
-          if grep -q "android.permission.INTERNET" permisos.txt; then echo "ERROR: el APK pide internet"; exit 1; fi
+          # Bibliotecas de anuncios o rastreo no se aceptan nunca
+          if unzip -l $APK | grep -qiE "com/google/android/gms/ads|com/facebook/ads|firebase/analytics|com/appsflyer|com/adjust/sdk"; then
+            echo "ERROR: el APK incluye anuncios o rastreo"; exit 1
+          fi
           $BT/apksigner verify --print-certs $APK | grep -i "SHA-256" || true
 
       - name: Renombrar

@@ -96,7 +96,8 @@ fun PantallaAcerca(onAtras: () -> Unit) {
             item {
                 Tarjeta {
                     Punto(Icons.Rounded.Shield, "Hace lo que dice, y nada más",
-                        "Sin anuncios, sin cuentas y sin permiso de internet: la app no puede enviar tus datos a ningún lado. " +
+                        "Sin anuncios, sin cuentas y sin servidores propios. Solo usa internet para limpiar tu correo, y se conecta " +
+                            "directo con tu proveedor (Gmail, Outlook…): tus datos no pasan por nadie más. " +
                             "Nada se borra sin que lo confirmes, y te dice con honestidad lo que Android no permite hacer.")
                     Spacer(Modifier.size(14.dp))
                     Punto(Icons.Rounded.Code, "Código abierto",

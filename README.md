@@ -6,7 +6,7 @@ Encuentra archivos basura, archivos de WhatsApp y Telegram, fotos repetidas y ca
 La mayoría de las apps "limpiadoras" muestran números inventados, llenan el teléfono de anuncios y prometen cosas que Android no permite.
 JCLEANER es lo contrario:
 
-- 🔒 **Sin permiso de internet.** La app no puede enviar tus datos a ningún lado (puedes comprobarlo en el `AndroidManifest.xml`).
+- 🔒 **Internet solo para tu correo.** La app usa internet únicamente en la sección Correo, y se conecta directo con tu proveedor (Gmail, Outlook…). No hay servidores de JCLEANER: tus datos no pasan por nadie más.
 - 🚫 **Sin anuncios, sin cuentas, sin rastreo.**
 - ✅ **Nada se borra sin tu confirmación.**
 - 📏 **Números reales.** Lo que muestra es lo que de verdad ocupa cada cosa.
@@ -36,6 +36,7 @@ Requiere Android 8.0 o más nuevo.
 | **Fotos borrosas** | Detecta fotos movidas o desenfocadas para que decidas si borrarlas. |
 | **Recordatorio semanal** | Una notificación si hay más de 100 MB de basura para limpiar (se puede apagar). |
 | **Historial** | Cuánto has liberado en total y en cada limpieza, y gráfico de la batería de las últimas 48 horas con consumo promedio por hora. |
+| **Correo** | Gmail, Outlook/Hotmail, Yahoo, iCloud y cualquier correo con IMAP. Vacía el spam y la papelera, encuentra correos repetidos y correos pesados, y agrupa los boletines por remitente para **desuscribirte** con un toque (desuscripción automática cuando el remitente la ofrece) y borrar todos sus correos. Solo lee encabezados, nunca el contenido. |
 | **Contactos** | Encuentra contactos repetidos: mismo teléfono (aunque esté escrito distinto o con otro nombre), mismo correo o mismo nombre. Los une en uno solo sin perder datos, quita números repetidos y contactos vacíos. Guarda un respaldo .vcf antes de cualquier cambio. |
 | **Caché** | Cuánto caché tiene cada app, ordenado de mayor a menor, con acceso directo para borrarlo. |
 | **Salud** | Estado, temperatura, voltaje, corriente, capacidad estimada vs. la de fábrica, ciclos de carga (Android 14+), almacenamiento, RAM y consejos. |
@@ -53,6 +54,7 @@ Requiere Android 8.0 o más nuevo.
 | Acceso a todos los archivos | Revisar y borrar basura, archivos de chats y fotos repetidas. |
 | Acceso de uso | Solo para medir el caché de cada app. |
 | Contactos | Solo para encontrar y unir contactos duplicados. |
+| Internet | Solo para la sección Correo: conexión directa y cifrada con tu servidor de correo. |
 | Notificaciones | Solo para el recordatorio semanal (opcional). |
 | Desinstalar apps | Abre la pantalla de desinstalación de Android; siempre confirmas tú. |
 | Ver apps instaladas | Para listar las apps en la sección Caché. |
@@ -71,6 +73,19 @@ app/src/main/java/cl/jcleaner/
 ├── ui/       pantallas
 └── util/     permisos y formatos
 ```
+
+## Correo: cómo se conecta
+
+- **Gmail, Yahoo, iCloud y otros:** con una *contraseña de aplicación* (requiere verificación en dos pasos). Tu contraseña normal no funciona en apps externas.
+- **Outlook / Hotmail:** Microsoft solo permite entrar con su página oficial (OAuth). Para eso la app debe estar registrada en Microsoft Entra:
+  1. En https://entra.microsoft.com → *Registros de aplicaciones* → *Nuevo registro*.
+  2. Tipos de cuenta: *Cuentas en cualquier directorio organizativo y cuentas Microsoft personales*.
+  3. URI de redirección: plataforma *Cliente público/nativo (móvil y escritorio)*, valor `cl.jcleaner://oauth2redirect`.
+  4. En *Permisos de API* → *Agregar* → *API que usa mi organización* → `Office 365 Exchange Online` → `IMAP.AccessAsUser.All` (delegado).
+  5. Copia el *Id. de aplicación (cliente)* y guárdalo como secreto `JCLEANER_MS_CLIENT_ID` en GitHub (*Settings → Secrets → Actions*).
+
+La contraseña de aplicación o la sesión de Microsoft se guardan cifradas con el almacén seguro de Android y nunca salen del teléfono.
+Antes de mover correos se piden confirmación, y van a la papelera de tu correo, no se borran de inmediato.
 
 ## Colaborar
 

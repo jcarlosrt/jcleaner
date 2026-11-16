@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.BatteryStd
 import androidx.compose.material.icons.rounded.Cached
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.Forum
@@ -217,6 +218,12 @@ fun PantallaInicio(onIr: (Pantalla) -> Unit, onPestana: (Pantalla) -> Unit) {
                 if (Motor.cantidadPapelera > 0) "${Motor.cantidadPapelera} archivos · ${Motor.enPapelera.legible()} (se liberan al vaciarla)"
                 else "Lo que borras queda aquí ${Papelera.DIAS} días por si te arrepientes") {
                 onIr(Pantalla.Papelera)
+            }
+        }
+        item {
+            Herramienta(Icons.Rounded.Mail, "Correo",
+                "Vacía spam y papelera, borra repetidos y desuscríbete de boletines (Gmail, Outlook y otros)") {
+                onIr(Pantalla.Correo)
             }
         }
         item {

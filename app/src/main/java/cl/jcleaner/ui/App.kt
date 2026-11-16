@@ -43,6 +43,7 @@ sealed interface Pantalla {
     data object Acerca : Pantalla
     data object Contactos : Pantalla
     data object Papelera : Pantalla
+    data object Correo : Pantalla
     data object Espacio : Pantalla
 
     /** Lista de archivos de una categoría; [obtener] lee siempre la versión actual (después de borrar). */
@@ -114,6 +115,7 @@ fun App() {
                 Pantalla.Acerca -> PantallaAcerca(onAtras = atras)
                 Pantalla.Contactos -> PantallaContactos(onAtras = atras)
                 Pantalla.Papelera -> PantallaPapelera(onAtras = atras)
+                Pantalla.Correo -> PantallaCorreo(onAtras = atras)
                 Pantalla.Espacio -> PantallaEspacio(onAtras = atras)
                 is Pantalla.Archivos -> PantallaArchivos(p, onAtras = atras)
             }

@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CancellationException
@@ -117,6 +118,14 @@ object Motor {
 
     fun analizarEspacio() =
         tarea("espacio", "Midiendo carpetas…", { progEspacio = it }, { av -> Escaner.mapaEspacio(av) }) { espacio = it }
+
+    // ------------------------------------------------------------------ correo
+
+    val correos = mutableStateMapOf<String, AnalisisCorreo>()
+    var progCorreo by mutableStateOf<String?>(null)
+
+    fun analizarCorreo(ctx: Context, c: CuentaCorreo) =
+        tarea("correo", "Conectando…", { progCorreo = it }, { av -> Correo.analizar(ctx, c, av) }) { correos[c.id] = it }
 
     // ------------------------------------------------------------------ papelera
 

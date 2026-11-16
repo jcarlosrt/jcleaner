@@ -17,7 +17,7 @@ Abre un [Issue](../../issues) e incluye:
 ## Principios que todo cambio debe respetar
 Estos principios son la razón de ser de la app; los cambios que no los cumplan no se aceptarán:
 
-1. **Sin permiso de internet**, sin anuncios, sin analíticas ni rastreo.
+1. **Internet solo para el correo**, conectando directo con el servidor del usuario. Sin servidores propios, sin anuncios, sin analíticas ni rastreo.
 2. **Nunca borrar nada sin confirmación** del usuario, y mostrar siempre cuánto se va a liberar.
 3. **Números reales.** Nada de cifras infladas, animaciones falsas de "optimización" ni "aceleradores de RAM".
 4. **Honestidad.** Si Android no permite algo, la app lo dice en vez de fingir que lo hace.
